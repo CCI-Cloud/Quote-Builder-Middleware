@@ -1,0 +1,11 @@
+quote-builder-middleware/
+  package.json
+  .env
+  src/
+    server.js
+    routes/
+      quoteBuilder.js
+    lib/
+      openaiClient.js
+      schema.js
+      normalize.js

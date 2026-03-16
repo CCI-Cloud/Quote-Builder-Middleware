@@ -1,0 +1,47 @@
+import express from "express";
+import { extractQuoteRequest } from "../lib/openaiClient.js";
+import { normalizeNetSuitePayload } from "../lib/normalize.js";
+
+const router = express.Router();
+
+function requireInternalToken(req, res, next) {
+	const auth = req.headers.authorization || "";
+	const expected = `Bearer ${process.env.INTERNAL_API_TOKEN}`;
+
+	if (!process.env.INTERNAL_API_TOKEN) {
+		return res
+			.status(500)
+			.json({ error: "Middleware is missing INTERNAL_API_TOKEN." });
+	}
+
+	if (auth !== expected) {
+		return res.status(401).json({ error: "Unauthorized" });
+	}
+
+	next();
+}
+
+router.post("/extract", requireInternalToken, async (req, res) => {
+	try {
+		const payload = normalizeNetSuitePayload(req.body);
+
+		if (!payload.email.subject && !payload.email.body_text) {
+			return res.status(400).json({
+				error: "Missing email content.",
+			});
+		}
+
+		const result = await extractQuoteRequest(payload);
+
+		return res.status(200).json(result);
+	} catch (error) {
+		console.error("Quote builder extract failed:", error);
+
+		return res.status(500).json({
+			error: "Quote extraction failed",
+			message: error?.message || "Unknown error",
+		});
+	}
+});
+
+export default router;

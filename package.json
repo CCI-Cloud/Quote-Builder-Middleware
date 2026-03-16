@@ -1,0 +1,19 @@
+{
+	"name": "quote-builder-middleware",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "node --check src/server.js && node --check src/routes/quoteBuilder.js && node --check src/lib/openaiClient.js && node --check src/lib/normalize.js && node --check src/lib/schema.js",
+		"dev": "node --watch src/server.js",
+		"start": "node src/server.js"
+	},
+	"engines": {
+		"node": ">=20"
+	},
+	"dependencies": {
+		"dotenv": "^16.4.5",
+		"express": "^4.21.2",
+		"openai": "^4.104.0"
+	}
+}
