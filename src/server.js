@@ -1,8 +1,6 @@
-import dotenv from "dotenv";
+import "dotenv/config";
 import express from "express";
 import quoteBuilderRouter from "./routes/quoteBuilder.js";
-
-dotenv.config();
 
 const app = express();
 

@@ -1,9 +1,15 @@
 import OpenAI from "openai";
 import { quoteBuilderSchema } from "./schema.js";
 
-const client = new OpenAI({
-	apiKey: process.env.OPENAI_API_KEY,
-});
+function getClient() {
+	if (!process.env.OPENAI_API_KEY) {
+		throw new Error("OPENAI_API_KEY environment variable is missing.");
+	}
+
+	return new OpenAI({
+		apiKey: process.env.OPENAI_API_KEY,
+	});
+}
 
 function buildDeveloperInstruction() {
 	return [
@@ -18,6 +24,7 @@ function buildDeveloperInstruction() {
 }
 
 export async function extractQuoteRequest(payload) {
+	const client = getClient();
 	const response = await client.responses.create({
 		model: process.env.OPENAI_MODEL || "gpt-5.4",
 		input: [
