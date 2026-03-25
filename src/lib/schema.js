@@ -70,6 +70,7 @@ export const quoteBuilderSchema = {
 						brand: { type: ["string", "null"] },
 						manufacturer_part_number: { type: ["string", "null"] },
 						category_hint: { type: ["string", "null"] },
+						product_description: { type: ["string", "null"] },
 						search_terms: {
 							type: "array",
 							items: { type: "string" },
