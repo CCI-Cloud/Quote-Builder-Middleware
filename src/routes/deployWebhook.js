@@ -17,6 +17,7 @@ const BRANCH_NAME = "main";
 const EXPECTED_REF = "refs/heads/main";
 const EXPECTED_REPO = "CCI-Cloud/Quote-Builder-Middleware";
 const LOG_FILE = path.resolve(__dirname, "../../deploywebhook.log");
+const DEBUG_ERRORS = process.env.DEBUG_DEPLOY_WEBHOOK === "true";
 
 function logEvent(level, message, context = {}) {
 	const entry = {
@@ -201,13 +202,19 @@ router.post("/", async (req, res) => {
 			cloudways,
 		});
 	} catch (error) {
+		const errorMessage =
+			error instanceof Error ? error.message : "Unknown error";
+		const errorStack = error instanceof Error ? error.stack : undefined;
+
 		logEvent("error", "Deployment failed", {
-			error: error.message,
+			error: errorMessage,
+			stack: errorStack,
 		});
 
 		return res.status(500).json({
 			ok: false,
 			error: "Deployment failed",
+			...(DEBUG_ERRORS ? { detail: errorMessage } : {}),
 		});
 	}
 });
