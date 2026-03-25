@@ -1,9 +1,15 @@
 import "dotenv/config";
 import express from "express";
+import deployWebhookRouter from "./routes/deployWebhook.js";
 import quoteBuilderRouter from "./routes/quoteBuilder.js";
 
 const app = express();
 
+app.use(
+	"/webhooks/github-deploy",
+	express.raw({ type: "application/json" }),
+	deployWebhookRouter,
+);
 app.use(express.json({ limit: "10mb" }));
 
 app.get("/health", (_req, res) => {
