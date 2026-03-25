@@ -106,6 +106,7 @@ export const quoteBuilderSchema = {
 						"brand",
 						"manufacturer_part_number",
 						"category_hint",
+						"product_description",
 						"search_terms",
 						"requires_review",
 					],
