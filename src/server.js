@@ -7,7 +7,7 @@ const app = express();
 
 app.use(
 	"/webhooks/github-deploy",
-	express.raw({ type: "application/json" }),
+	express.raw({ type: "*/*", limit: "10mb" }),
 	deployWebhookRouter,
 );
 app.use(express.json({ limit: "10mb" }));

@@ -69,6 +69,39 @@ function safeCompareSignature(payloadBuffer, signatureHeader, secret) {
 	return crypto.timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
+function getPayloadBuffer(body) {
+	if (Buffer.isBuffer(body)) {
+		return body;
+	}
+
+	if (typeof body === "string") {
+		return Buffer.from(body, "utf8");
+	}
+
+	if (body && typeof body === "object") {
+		return Buffer.from(JSON.stringify(body), "utf8");
+	}
+
+	return Buffer.from("", "utf8");
+}
+
+function parseGitHubPayload(payloadBuffer, contentType) {
+	const rawText = payloadBuffer.toString("utf8");
+
+	if (contentType.includes("application/x-www-form-urlencoded")) {
+		const params = new URLSearchParams(rawText);
+		const payload = params.get("payload");
+
+		if (!payload) {
+			throw new Error("Missing payload field in form-encoded GitHub request");
+		}
+
+		return JSON.parse(payload);
+	}
+
+	return JSON.parse(rawText);
+}
+
 async function callCloudwaysApi(path, accessToken, postFields) {
 	const response = await fetch(`${API_URL}${path}`, {
 		method: "POST",
@@ -129,10 +162,9 @@ router.post("/", async (req, res) => {
 		const secret = getRequiredEnv("WEBHOOK_SECRET");
 		const signatureHeader = req.get("X-Hub-Signature-256") || "";
 		const event = req.get("X-GitHub-Event") || "";
+		const contentType = req.get("Content-Type") || "";
 		const deliveryId = req.get("X-GitHub-Delivery") || null;
-		const payloadBuffer = Buffer.isBuffer(req.body)
-			? req.body
-			: Buffer.from(req.body || "");
+		const payloadBuffer = getPayloadBuffer(req.body);
 
 		if (!safeCompareSignature(payloadBuffer, signatureHeader, secret)) {
 			logEvent("warning", "GitHub signature verification failed", {
@@ -151,8 +183,13 @@ router.post("/", async (req, res) => {
 		let payload;
 
 		try {
-			payload = JSON.parse(payloadBuffer.toString("utf8"));
-		} catch {
+			payload = parseGitHubPayload(payloadBuffer, contentType);
+		} catch (error) {
+			logEvent("warning", "Invalid GitHub payload", {
+				deliveryId,
+				contentType,
+				error: error instanceof Error ? error.message : "Unknown error",
+			});
 			return res.status(400).json({ ok: false, error: "Invalid JSON payload" });
 		}
 
