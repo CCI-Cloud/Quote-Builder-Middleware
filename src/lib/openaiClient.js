@@ -1,3 +1,11 @@
+/**
+ * OpenAI integration for quote request extraction.
+ *
+ * This file builds the OpenAI client, defines the high-level extraction rules,
+ * and sends normalized quote request payloads to the Responses API. The model
+ * is asked to return data that matches the shared JSON schema so the rest of
+ * the application can rely on a consistent output shape.
+ */
 import OpenAI from "openai";
 import { quoteBuilderSchema } from "./schema.js";
 
@@ -12,6 +20,7 @@ function getClient() {
 }
 
 function buildDeveloperInstruction() {
+	// Keep the extraction prompt compact and rule-driven so the schema can do the heavy lifting.
 	return [
 		"You extract quote requests from NetSuite support case emails.",
 		"Return only schema-compliant JSON.",
@@ -49,6 +58,7 @@ export async function extractQuoteRequest(payload) {
 		],
 		text: {
 			format: {
+				// Structured outputs keep the downstream route from having to guess at model shape.
 				type: "json_schema",
 				...quoteBuilderSchema,
 			},

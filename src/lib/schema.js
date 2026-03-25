@@ -1,3 +1,20 @@
+/**
+ * JSON schema for structured quote extraction results.
+ *
+ * This schema is passed directly to the OpenAI Responses API so the model
+ * returns a predictable, machine-friendly result. It describes the information
+ * the business cares about most:
+ * - whether the message is truly a quote request
+ * - who the customer appears to be
+ * - any special pricing or handling instructions
+ * - the requested items and how confident the extraction is
+ * - review flags that help a human quickly spot uncertain cases
+ *
+ * Keeping the schema in its own file makes it easier to evolve the extraction
+ * contract without mixing it into route or transport logic.
+ */
+// This schema is shared directly with the OpenAI Responses API so every extraction
+// comes back in a predictable shape for downstream review and automation.
 export const quoteBuilderSchema = {
 	name: "quote_builder_extraction",
 	strict: true,
@@ -71,6 +88,7 @@ export const quoteBuilderSchema = {
 						manufacturer_part_number: { type: ["string", "null"] },
 						category_hint: { type: ["string", "null"] },
 						product_description: { type: ["string", "null"] },
+						// Search terms give downstream systems something usable even when the match is fuzzy.
 						search_terms: {
 							type: "array",
 							items: { type: "string" },

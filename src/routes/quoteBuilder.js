@@ -1,3 +1,16 @@
+/**
+ * Route handler for quote extraction requests.
+ *
+ * This file exposes the middleware endpoint that trusted internal systems call
+ * when they want an inbound NetSuite email or case payload analyzed. The route:
+ * - checks the internal bearer token
+ * - normalizes the incoming request into a stable application shape
+ * - sends the cleaned payload to the OpenAI extraction layer
+ * - returns structured JSON for downstream review or automation
+ *
+ * The goal is to keep HTTP concerns here and leave model-specific logic in the
+ * library layer.
+ */
 import express from "express";
 import { extractQuoteRequest } from "../lib/openaiClient.js";
 import { normalizeNetSuitePayload } from "../lib/normalize.js";
@@ -5,6 +18,7 @@ import { normalizeNetSuitePayload } from "../lib/normalize.js";
 const router = express.Router();
 
 function requireInternalToken(req, res, next) {
+	// This endpoint is intended for trusted internal callers only.
 	const auth = req.headers.authorization || "";
 	const expected = `Bearer ${process.env.INTERNAL_API_TOKEN}`;
 
@@ -23,6 +37,7 @@ function requireInternalToken(req, res, next) {
 
 router.post("/extract", requireInternalToken, async (req, res) => {
 	try {
+		// Normalize upstream payloads so the extraction layer always sees the same shape.
 		const payload = normalizeNetSuitePayload(req.body);
 
 		if (!payload.email.subject && !payload.email.body_text) {

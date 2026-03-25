@@ -1,3 +1,18 @@
+/**
+ * GitHub deployment webhook route.
+ *
+ * This file handles signed webhook requests from GitHub and turns a valid push
+ * to the production branch into a Cloudways `git pull` action. It is responsible
+ * for:
+ * - validating the GitHub signature against the raw request body
+ * - checking that the event, repository, and branch are the expected ones
+ * - requesting a Cloudways access token
+ * - triggering the Cloudways pull for the configured app
+ * - recording webhook activity to a local log file for troubleshooting
+ *
+ * Keeping this logic in its own route makes deployment automation independent
+ * from the quote-extraction workflow.
+ */
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -49,6 +64,7 @@ function getRequiredEnv(name) {
 }
 
 function safeCompareSignature(payloadBuffer, signatureHeader, secret) {
+	// GitHub signs the exact raw payload bytes, so we compare against the untouched body.
 	if (!signatureHeader?.startsWith("sha256=")) {
 		return false;
 	}
@@ -70,6 +86,7 @@ function safeCompareSignature(payloadBuffer, signatureHeader, secret) {
 }
 
 function getPayloadBuffer(body) {
+	// Express may hand us a Buffer, string, or parsed object depending on middleware behavior.
 	if (Buffer.isBuffer(body)) {
 		return body;
 	}
@@ -88,6 +105,7 @@ function getPayloadBuffer(body) {
 function parseGitHubPayload(payloadBuffer, contentType) {
 	const rawText = payloadBuffer.toString("utf8");
 
+	// Some GitHub/webhook setups still send the JSON payload inside a form field.
 	if (contentType.includes("application/x-www-form-urlencoded")) {
 		const params = new URLSearchParams(rawText);
 		const payload = params.get("payload");
@@ -149,6 +167,7 @@ async function fetchAccessToken() {
 }
 
 async function triggerGitPull(accessToken) {
+	// Cloudways handles the actual repository pull on the target app.
 	return callCloudwaysApi("/git/pull", accessToken, {
 		server_id: String(SERVER_ID),
 		app_id: String(APP_ID),
@@ -222,6 +241,7 @@ router.post("/", async (req, res) => {
 			ref: payload?.ref || null,
 		});
 
+		// Only after the webhook is fully validated do we call Cloudways to pull `main`.
 		const accessToken = await fetchAccessToken();
 		const cloudways = await triggerGitPull(accessToken);
 
