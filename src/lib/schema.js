@@ -96,7 +96,7 @@ export const quoteBuilderSchema = {
 						requires_review: { type: "boolean" },
 						extraction_confidence: { type: ["number", "null"] },
 						review_reason: { type: ["string", "null"] },
-						requested_line_no: { type: ["integer", "null"] },
+						requested_line_no: { type: ["string", "null"] },
 					},
 					required: [
 						"line_number",
