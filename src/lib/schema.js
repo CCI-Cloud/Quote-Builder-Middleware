@@ -94,6 +94,8 @@ export const quoteBuilderSchema = {
 							items: { type: "string" },
 						},
 						requires_review: { type: "boolean" },
+						extraction_confidence: { type: ["number", "null"] },
+						review_reason: { type: ["string", "null"] },
 					},
 					required: [
 						"line_number",
@@ -109,6 +111,8 @@ export const quoteBuilderSchema = {
 						"product_description",
 						"search_terms",
 						"requires_review",
+						"extraction_confidence",
+						"review_reason",
 					],
 				},
 			},
