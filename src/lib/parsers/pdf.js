@@ -1,4 +1,4 @@
-import pdfParse from "pdf-parse";
+import * as pdfParse from "pdf-parse";
 
 export async function parsePdfAttachment(attachment, options = {}) {
 	const buffer = Buffer.from(attachment.content_base64, "base64");
