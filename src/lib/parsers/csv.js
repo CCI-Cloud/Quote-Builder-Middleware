@@ -6,9 +6,20 @@ export async function parseCsvAttachment(attachment) {
 	const summary = summarizeCsv(text);
 
 	return {
-		status: "processed",
-		reason: null,
-		method: "csv_parse",
-		text: summary,
+		status: summary ? "processed" : "skipped",
+		reason: summary ? null : "empty_csv",
+		method: summary ? "csv_parse" : null,
+		text: summary || "",
 	};
+}
+
+function summarizeCsv(text) {
+	const raw = String(text || "").trim();
+	if (!raw) return "";
+
+	const lines = raw.split(/\r?\n/).filter(Boolean);
+	if (!lines.length) return "";
+
+	const previewLines = lines.slice(0, 25);
+	return previewLines.join("\n");
 }

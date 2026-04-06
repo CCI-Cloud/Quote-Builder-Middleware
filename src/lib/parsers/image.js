@@ -8,13 +8,10 @@ export async function parseImageAttachment(attachment, options = {}) {
 		};
 	}
 
-	const buffer = Buffer.from(attachment.content_base64, "base64");
-	const text = await runImageOcr(buffer);
-
 	return {
-		status: "processed",
-		reason: null,
-		method: "image_ocr",
-		text: (text || "").trim(),
+		status: "skipped",
+		reason: "image_ocr_not_implemented",
+		method: null,
+		text: "",
 	};
 }

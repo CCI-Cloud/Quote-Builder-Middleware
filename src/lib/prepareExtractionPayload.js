@@ -1,9 +1,13 @@
 import { processAttachment } from "./processAttachment.js";
 
 export async function prepareExtractionPayload(payload) {
-	const attachments = Array.isArray(payload.attachments)
-		? payload.attachments
-		: [];
+	const options = payload.processing_options || {};
+	const maxAttachments = Number(options.max_attachments) || 5;
+	const maxFileSizeBytes =
+		Number(options.max_file_size_bytes) || 10 * 1024 * 1024;
+	const attachments = (
+		Array.isArray(payload.attachments) ? payload.attachments : []
+	).slice(0, maxAttachments);
 	const blocks = [];
 	const details = [];
 

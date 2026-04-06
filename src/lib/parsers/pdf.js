@@ -1,7 +1,9 @@
+import pdfParse from "pdf-parse";
+
 export async function parsePdfAttachment(attachment, options = {}) {
 	const buffer = Buffer.from(attachment.content_base64, "base64");
 
-	const text = await extractPdfText(buffer); // your chosen library
+	const text = await extractPdfText(buffer);
 
 	if (text && text.trim().length >= 50) {
 		return {
@@ -13,12 +15,11 @@ export async function parsePdfAttachment(attachment, options = {}) {
 	}
 
 	if (options.ocr_scanned_pdfs) {
-		const ocrText = await runPdfOcr(buffer);
 		return {
-			status: "processed",
-			reason: null,
-			method: "pdf_ocr",
-			text: (ocrText || "").trim(),
+			status: "skipped",
+			reason: "pdf_ocr_not_implemented",
+			method: null,
+			text: "",
 		};
 	}
 
@@ -28,4 +29,9 @@ export async function parsePdfAttachment(attachment, options = {}) {
 		method: null,
 		text: "",
 	};
+}
+
+async function extractPdfText(buffer) {
+	const result = await pdfParse(buffer);
+	return String(result?.text || "").trim();
 }

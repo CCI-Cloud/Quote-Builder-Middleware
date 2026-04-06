@@ -14,6 +14,7 @@
 import express from "express";
 import { extractQuoteRequest } from "../lib/openaiClient.js";
 import { normalizeNetSuitePayload } from "../lib/normalize.js";
+import { prepareExtractionPayload } from "../lib/prepareExtractionPayload.js";
 
 const router = express.Router();
 
@@ -48,7 +49,10 @@ router.post("/extract", requireInternalToken, async (req, res) => {
 
 		const preparedPayload = await prepareExtractionPayload(payload);
 		const result = await extractQuoteRequest(preparedPayload);
-		return res.status(200).json(result);
+		return res.status(200).json({
+			...result,
+			attachment_processing: preparedPayload.attachment_processing,
+		});
 	} catch (error) {
 		console.error("Quote builder extract failed:", error);
 
