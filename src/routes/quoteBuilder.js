@@ -46,8 +46,8 @@ router.post("/extract", requireInternalToken, async (req, res) => {
 			});
 		}
 
-		const result = await extractQuoteRequest(payload);
-
+		const preparedPayload = await prepareExtractionPayload(payload);
+		const result = await extractQuoteRequest(preparedPayload);
 		return res.status(200).json(result);
 	} catch (error) {
 		console.error("Quote builder extract failed:", error);

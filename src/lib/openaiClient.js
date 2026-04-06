@@ -32,6 +32,80 @@ function buildDeveloperInstruction() {
 	].join(" ");
 }
 
+function buildExtractionInput(payload) {
+	const email = payload?.email || {};
+	const ctx = payload?.prepared_context || {};
+
+	const subject = ctx.email_subject || email.subject || "";
+	const body = ctx.email_body_text || email.body_text || "";
+
+	const attachmentBlocks = Array.isArray(ctx.attachment_text_blocks)
+		? ctx.attachment_text_blocks
+		: [];
+
+	const parts = [];
+
+	// -------------------------
+	// Email content
+	// -------------------------
+	if (subject) {
+		parts.push(`EMAIL SUBJECT:\n${subject}`);
+	}
+
+	if (body) {
+		parts.push(`EMAIL BODY:\n${body}`);
+	}
+
+	// -------------------------
+	// Attachments
+	// -------------------------
+	if (attachmentBlocks.length) {
+		parts.push(`ATTACHMENTS:`);
+
+		for (const block of attachmentBlocks) {
+			parts.push(
+				`---\nFILE: ${block.file_name || "unknown"}\nTYPE: ${
+					block.extraction_method || "unknown"
+				}\n\n${block.text || ""}`,
+			);
+		}
+	}
+
+	// -------------------------
+	// Instructions to model
+	// -------------------------
+	parts.push(`
+INSTRUCTIONS:
+
+- The email and attachments together represent a potential quote request.
+- Attachments may contain more accurate or complete line item details than the email body.
+- Prefer attachment data when it is more specific than the email.
+- Do NOT duplicate items found in both email and attachments.
+- Merge overlapping information into a single clean item.
+- Preserve original wording when uncertain.
+- Do NOT invent SKUs, quantities, or product details.
+- If uncertain, mark requires_review = true.
+- If attachments contain tabular data, interpret rows as potential line items.
+`);
+
+	// -------------------------
+	// Optional debug context
+	// -------------------------
+	parts.push(`
+DEBUG_CONTEXT (do not rely on this for extraction, informational only):
+${JSON.stringify(
+	{
+		attachment_count: attachmentBlocks.length,
+		request_version: payload.request_version,
+	},
+	null,
+	2,
+)}
+`);
+
+	return parts.join("\n\n");
+}
+
 export async function extractQuoteRequest(payload) {
 	const client = getClient();
 	const response = await client.responses.create({
@@ -51,7 +125,7 @@ export async function extractQuoteRequest(payload) {
 				content: [
 					{
 						type: "input_text",
-						text: JSON.stringify(payload),
+						text: buildExtractionInput(payload),
 					},
 				],
 			},
