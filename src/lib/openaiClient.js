@@ -64,9 +64,17 @@ function buildExtractionInput(payload) {
 
 		for (const block of attachmentBlocks) {
 			parts.push(
-				`---\nFILE: ${block.file_name || "unknown"}\nTYPE: ${
-					block.extraction_method || "unknown"
-				}\n\n${block.text || ""}`,
+				[
+					"---",
+					`ATTACHMENT ID: ${block.attachment_id || "unknown"}`,
+					`FILE NAME: ${block.file_name || "unknown"}`,
+					`FILE EXTENSION: ${block.file_ext || "unknown"}`,
+					`EXTRACTION METHOD: ${block.extraction_method || "unknown"}`,
+					"",
+					"[BEGIN ATTACHMENT TEXT]",
+					block.text || "",
+					"[END ATTACHMENT TEXT]",
+				].join("\n"),
 			);
 		}
 	}
@@ -86,6 +94,11 @@ INSTRUCTIONS:
 - Do NOT invent SKUs, quantities, or product details.
 - If uncertain, mark requires_review = true.
 - If attachments contain tabular data, interpret rows as potential line items.
+For every extracted item:
+- identify which attachment provided the strongest evidence
+- populate source_attachment with the attachment filename
+- populate source_evidence with the exact supporting text
+- source_evidence should be short and directly support the extraction
 `);
 
 	// -------------------------

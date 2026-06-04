@@ -16,6 +16,7 @@
 		"express": "^4.21.2",
 		"openai": "^4.104.0",
 		"pdf-parse": "^2.4.5",
+		"tesseract.js": "^7.0.0",
 		"xlsx": "^0.18.5"
 	}
 }
