@@ -43,17 +43,85 @@ export async function researchExtractedItems(items = []) {
 async function researchSingleItem(item) {
 	const client = getClient();
 
-	const prompt = `
-You are helping a CSR identify an unknown product from a quote request.
-
-Use the provided extracted item data.
-Do not invent facts.
-If the product is uncertain, say so clearly.
-Return decision-support information only.
-This should help a CSR create a NetSuite item manually if needed.
+	// CALL 1: Web research only, no JSON mode
+	const researchResponse = await client.responses.create({
+		model:
+			process.env.OPENAI_RESEARCH_MODEL ||
+			process.env.OPENAI_MODEL ||
+			"gpt-5.4",
+		tools: [
+			{
+				type: "web_search",
+				search_context_size: "medium",
+			},
+		],
+		input: [
+			{
+				role: "developer",
+				content: [
+					{
+						type: "input_text",
+						text: "You research products for CSR quote review. Use web search when useful. Be careful with OCR uncertainty. Do not invent facts.",
+					},
+				],
+			},
+			{
+				role: "user",
+				content: [
+					{
+						type: "input_text",
+						text: `
+Research this extracted quote item.
 
 Extracted item:
 ${JSON.stringify(item, null, 2)}
+
+Find:
+- probable manufacturer
+- probable brand
+- probable model
+- probable item type
+- product category
+- useful CSR description
+- possible source URLs
+- warnings about uncertainty
+
+Return a concise research summary with source URLs if found.
+`,
+					},
+				],
+			},
+		],
+	});
+
+	const researchText = researchResponse.output_text || "";
+
+	// CALL 2: Convert research text into JSON, no web search
+	const jsonResponse = await client.responses.create({
+		model: process.env.OPENAI_MODEL || "gpt-5.4",
+		input: [
+			{
+				role: "developer",
+				content: [
+					{
+						type: "input_text",
+						text: "Return valid JSON only. Convert product research into the requested JSON shape.",
+					},
+				],
+			},
+			{
+				role: "user",
+				content: [
+					{
+						type: "input_text",
+						text: `
+Convert this product research into JSON.
+
+Extracted item:
+${JSON.stringify(item, null, 2)}
+
+Research summary:
+${researchText}
 
 Return JSON only:
 
@@ -71,37 +139,16 @@ Return JSON only:
   "suggested_search_terms": [],
   "confidence": 0,
   "warnings": [],
-  "notes_for_csr": []
+  "notes_for_csr": [],
+  "sources": [
+    {
+      "title": "",
+      "url": "",
+      "summary": ""
+    }
+  ]
 }
-`;
-
-	const response = await client.responses.create({
-		model:
-			process.env.OPENAI_RESEARCH_MODEL ||
-			process.env.OPENAI_MODEL ||
-			"gpt-5.4",
-		tools: [
-			{
-				type: "web_search",
-				search_context_size: "medium",
-			},
-		],
-		input: [
-			{
-				role: "developer",
-				content: [
-					{
-						type: "input_text",
-						text: "Return valid JSON only. Use web search when the extracted item is not identifiable from the provided OCR text. Include source URLs in the sources array.",
-					},
-				],
-			},
-			{
-				role: "user",
-				content: [
-					{
-						type: "input_text",
-						text: prompt,
+`,
 					},
 				],
 			},
@@ -113,5 +160,5 @@ Return JSON only:
 		},
 	});
 
-	return JSON.parse(response.output_text);
+	return JSON.parse(jsonResponse.output_text);
 }
