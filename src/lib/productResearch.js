@@ -76,14 +76,23 @@ Return JSON only:
 `;
 
 	const response = await client.responses.create({
-		model: process.env.OPENAI_MODEL || "gpt-5.4",
+		model:
+			process.env.OPENAI_RESEARCH_MODEL ||
+			process.env.OPENAI_MODEL ||
+			"gpt-5.4",
+		tools: [
+			{
+				type: "web_search",
+				search_context_size: "medium",
+			},
+		],
 		input: [
 			{
 				role: "developer",
 				content: [
 					{
 						type: "input_text",
-						text: "Return valid JSON only. You are assisting product identification for quote review.",
+						text: "Return valid JSON only. Use web search when the extracted item is not identifiable from the provided OCR text. Include source URLs in the sources array.",
 					},
 				],
 			},
