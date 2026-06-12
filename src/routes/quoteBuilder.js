@@ -16,6 +16,7 @@ import { extractQuoteRequest } from "../lib/openaiClient.js";
 import { normalizeNetSuitePayload } from "../lib/normalize.js";
 import { prepareExtractionPayload } from "../lib/prepareExtractionPayload.js";
 import { researchExtractedItems } from "../lib/productResearch.js";
+import { researchSupplierAvailability } from "../lib/supplierResearch.js";
 
 const router = express.Router();
 
@@ -51,9 +52,12 @@ router.post("/extract", requireInternalToken, async (req, res) => {
 		const preparedPayload = await prepareExtractionPayload(payload);
 		const result = await extractQuoteRequest(preparedPayload);
 		const researchedItems = await researchExtractedItems(result.items || []);
+		const supplierResearchedItems =
+			await researchSupplierAvailability(researchedItems);
 		return res.status(200).json({
 			...result,
-			items: researchedItems,
+			// items: researchedItems,
+			items: supplierResearchedItems,
 			attachment_processing: preparedPayload.attachment_processing,
 		});
 	} catch (error) {
