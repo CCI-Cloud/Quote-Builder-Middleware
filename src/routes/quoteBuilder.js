@@ -16,7 +16,7 @@ import { extractQuoteRequest } from "../lib/openaiClient.js";
 import { normalizeNetSuitePayload } from "../lib/normalize.js";
 import { prepareExtractionPayload } from "../lib/prepareExtractionPayload.js";
 import { researchExtractedItems } from "../lib/productResearch.js";
-import { researchSupplierAvailability } from "../lib/supplierResearch.js";
+import { researchSingleItemSuppliers } from "../lib/supplierResearch.js";
 
 const router = express.Router();
 
@@ -52,12 +52,10 @@ router.post("/extract", requireInternalToken, async (req, res) => {
 		const preparedPayload = await prepareExtractionPayload(payload);
 		const result = await extractQuoteRequest(preparedPayload);
 		const researchedItems = await researchExtractedItems(result.items || []);
-		// const supplierResearchedItems =
-		// 	await researchSupplierAvailability(researchedItems);
+
 		return res.status(200).json({
 			...result,
 			items: researchedItems,
-			// items: supplierResearchedItems,
 			attachment_processing: preparedPayload.attachment_processing,
 		});
 	} catch (error) {
@@ -66,6 +64,41 @@ router.post("/extract", requireInternalToken, async (req, res) => {
 		return res.status(500).json({
 			error: "Quote extraction failed",
 			message: error?.message || "Unknown error",
+		});
+	}
+});
+
+router.post("/supplier-research", async (req, res) => {
+	try {
+		const token = req.headers.authorization || "";
+		const expected = `Bearer ${process.env.QB_MIDDLEWARE_TOKEN || ""}`;
+
+		if (expected.trim() && token !== expected) {
+			return res.status(401).json({
+				error: "Unauthorized",
+			});
+		}
+
+		const item = req.body?.item || null;
+
+		if (!item) {
+			return res.status(400).json({
+				error: "Missing item payload.",
+			});
+		}
+
+		const supplierResearch = await researchSingleItemSuppliers(item);
+
+		return res.status(200).json({
+			success: true,
+			supplier_research: supplierResearch,
+		});
+	} catch (e) {
+		console.error("Supplier research failed", e);
+
+		return res.status(500).json({
+			success: false,
+			error: e.message || String(e),
 		});
 	}
 });

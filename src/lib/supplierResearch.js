@@ -34,7 +34,7 @@ export async function researchSupplierAvailability(items = []) {
 	return researched;
 }
 
-async function researchSingleItemSuppliers(item) {
+export async function researchSingleItemSuppliers(item) {
 	const client = getClient();
 
 	const searchText = [
