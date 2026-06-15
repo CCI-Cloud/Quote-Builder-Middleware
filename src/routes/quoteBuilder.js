@@ -52,12 +52,12 @@ router.post("/extract", requireInternalToken, async (req, res) => {
 		const preparedPayload = await prepareExtractionPayload(payload);
 		const result = await extractQuoteRequest(preparedPayload);
 		const researchedItems = await researchExtractedItems(result.items || []);
-		const supplierResearchedItems =
-			await researchSupplierAvailability(researchedItems);
+		// const supplierResearchedItems =
+		// 	await researchSupplierAvailability(researchedItems);
 		return res.status(200).json({
 			...result,
-			// items: researchedItems,
-			items: supplierResearchedItems,
+			items: researchedItems,
+			// items: supplierResearchedItems,
 			attachment_processing: preparedPayload.attachment_processing,
 		});
 	} catch (error) {
