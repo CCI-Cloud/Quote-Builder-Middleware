@@ -71,9 +71,19 @@ router.post("/extract", requireInternalToken, async (req, res) => {
 router.post("/supplier-research", async (req, res) => {
 	try {
 		const token = req.headers.authorization || "";
-		const expected = `Bearer ${process.env.QB_MIDDLEWARE_TOKEN || ""}`;
+		const expectedToken =
+			process.env.QB_MIDDLEWARE_TOKEN ||
+			process.env.QB_TOKEN ||
+			process.env.MIDDLEWARE_TOKEN ||
+			"KUJI329JISHNS&D&DKnedhwe_";
 
-		if (expected.trim() && token !== expected) {
+		const expected = "Bearer " + expectedToken;
+
+		if (token !== expected) {
+			console.error("Supplier research unauthorized", {
+				received: token,
+				expectedStartsWith: expected.substring(0, 15),
+			});
 			return res.status(401).json({
 				error: "Unauthorized",
 			});
