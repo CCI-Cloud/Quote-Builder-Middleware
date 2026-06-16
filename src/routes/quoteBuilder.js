@@ -16,7 +16,7 @@ import { extractQuoteRequest } from "../lib/openaiClient.js";
 import { normalizeNetSuitePayload } from "../lib/normalize.js";
 import { prepareExtractionPayload } from "../lib/prepareExtractionPayload.js";
 import { researchExtractedItems } from "../lib/productResearch.js";
-import { researchSingleItemSuppliers } from "../lib/supplierResearch.js";
+// import { researchSingleItemSuppliers } from "../lib/supplierResearch.js";
 
 const router = express.Router();
 
@@ -68,49 +68,49 @@ router.post("/extract", requireInternalToken, async (req, res) => {
 	}
 });
 
-router.post("/supplier-research", async (req, res) => {
-	try {
-		const token = req.headers.authorization || "";
-		const expectedToken =
-			process.env.QB_MIDDLEWARE_TOKEN ||
-			process.env.QB_TOKEN ||
-			process.env.MIDDLEWARE_TOKEN ||
-			"KUJI329JISHNS&D&DKnedhwe_";
+// router.post("/supplier-research", async (req, res) => {
+// 	try {
+// 		const token = req.headers.authorization || "";
+// 		const expectedToken =
+// 			process.env.QB_MIDDLEWARE_TOKEN ||
+// 			process.env.QB_TOKEN ||
+// 			process.env.MIDDLEWARE_TOKEN ||
+// 			"KUJI329JISHNS&D&DKnedhwe_";
 
-		const expected = "Bearer " + expectedToken;
+// 		const expected = "Bearer " + expectedToken;
 
-		if (token !== expected) {
-			console.error("Supplier research unauthorized", {
-				received: token,
-				expectedStartsWith: expected.substring(0, 15),
-			});
-			return res.status(401).json({
-				error: "Unauthorized",
-			});
-		}
+// 		if (token !== expected) {
+// 			console.error("Supplier research unauthorized", {
+// 				received: token,
+// 				expectedStartsWith: expected.substring(0, 15),
+// 			});
+// 			return res.status(401).json({
+// 				error: "Unauthorized",
+// 			});
+// 		}
 
-		const item = req.body?.item || null;
+// 		const item = req.body?.item || null;
 
-		if (!item) {
-			return res.status(400).json({
-				error: "Missing item payload.",
-			});
-		}
+// 		if (!item) {
+// 			return res.status(400).json({
+// 				error: "Missing item payload.",
+// 			});
+// 		}
 
-		const supplierResearch = await researchSingleItemSuppliers(item);
+// 		const supplierResearch = await researchSingleItemSuppliers(item);
 
-		return res.status(200).json({
-			success: true,
-			supplier_research: supplierResearch,
-		});
-	} catch (e) {
-		console.error("Supplier research failed", e);
+// 		return res.status(200).json({
+// 			success: true,
+// 			supplier_research: supplierResearch,
+// 		});
+// 	} catch (e) {
+// 		console.error("Supplier research failed", e);
 
-		return res.status(500).json({
-			success: false,
-			error: e.message || String(e),
-		});
-	}
-});
+// 		return res.status(500).json({
+// 			success: false,
+// 			error: e.message || String(e),
+// 		});
+// 	}
+// });
 
 export default router;
