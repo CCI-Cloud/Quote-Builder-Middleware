@@ -51,10 +51,11 @@ router.post("/extract", requireInternalToken, async (req, res) => {
 
 		const preparedPayload = await prepareExtractionPayload(payload);
 		const result = await extractQuoteRequest(preparedPayload);
+		const researchedItems = await researchExtractedItems(result.items || []);
 
 		return res.status(200).json({
 			...result,
-			items: result.items || [],
+			items: researchedItems,
 			attachment_processing: preparedPayload.attachment_processing,
 		});
 	} catch (error) {
