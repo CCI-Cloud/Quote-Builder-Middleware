@@ -1,7 +1,4 @@
-import * as pdf from "pdf-parse";
-
-// If the namespace import fails, you can fall back to this:
-const pdfParse = pdf.default || pdf;
+import { PDFParse } from "pdf-parse";
 
 export async function parsePdfAttachment(attachment, options = {}) {
 	// Ensure we have valid base64 content
@@ -37,12 +34,16 @@ export async function parsePdfAttachment(attachment, options = {}) {
 }
 
 async function extractPdfText(buffer) {
+	let parser;
+
 	try {
-		// pdf-parse is a function, so we call it directly from our resolved reference
-		const result = await pdfParse(buffer);
+		parser = new PDFParse({ data: buffer });
+		const result = await parser.getText();
 		return String(result?.text || "").trim();
 	} catch (error) {
 		console.error("PDF Parsing Error:", error);
 		return "";
+	} finally {
+		await parser?.destroy();
 	}
 }
