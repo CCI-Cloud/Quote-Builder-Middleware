@@ -38,10 +38,63 @@ function requireInternalToken(req, res, next) {
 	next();
 }
 
+//! old extract route pre timer implementation
+// router.post("/extract", requireInternalToken, async (req, res) => {
+// 	try {
+// 		// Normalize upstream payloads so the extraction layer always sees the same shape.
+// 		const payload = normalizeNetSuitePayload(req.body);
+
+// 		if (!payload.email.subject && !payload.email.body_text) {
+// 			return res.status(400).json({
+// 				error: "Missing email content.",
+// 			});
+// 		}
+
+// 		const preparedPayload = await prepareExtractionPayload(payload);
+// 		const result = await extractQuoteRequest(preparedPayload);
+// 		const researchedItems = await researchExtractedItems(result.items || []);
+
+// 		return res.status(200).json({
+// 			...result,
+// 			items: researchedItems,
+// 			attachment_processing: preparedPayload.attachment_processing,
+// 		});
+// 	} catch (error) {
+// 		console.error("Quote builder extract failed:", error);
+
+// 		return res.status(500).json({
+// 			error: "Quote extraction failed",
+// 			message: error?.message || "Unknown error",
+// 		});
+// 	}
+// });
+
 router.post("/extract", requireInternalToken, async (req, res) => {
+	const startedAt = Date.now();
+
+	function mark(label, extra = {}) {
+		console.log(
+			JSON.stringify({
+				event: "qb_timing",
+				label,
+				elapsed_ms: Date.now() - startedAt,
+				...extra,
+			}),
+		);
+	}
+
 	try {
-		// Normalize upstream payloads so the extraction layer always sees the same shape.
+		mark("start");
+
 		const payload = normalizeNetSuitePayload(req.body);
+
+		mark("normalized", {
+			attachment_count: Array.isArray(payload.attachments)
+				? payload.attachments.length
+				: 0,
+			case_internalid: payload?.source?.case_internalid || null,
+			message_internalid: payload?.source?.message_internalid || null,
+		});
 
 		if (!payload.email.subject && !payload.email.body_text) {
 			return res.status(400).json({
@@ -50,16 +103,51 @@ router.post("/extract", requireInternalToken, async (req, res) => {
 		}
 
 		const preparedPayload = await prepareExtractionPayload(payload);
+
+		mark("prepared_payload", {
+			processed_attachments:
+				preparedPayload?.attachment_processing?.processed_count,
+			skipped_attachments:
+				preparedPayload?.attachment_processing?.skipped_count,
+			details: preparedPayload?.attachment_processing?.details || [],
+		});
+
 		const result = await extractQuoteRequest(preparedPayload);
+
+		mark("extraction_complete", {
+			is_quote: result?.quote_assessment?.is_quote_request,
+			classification: result?.quote_assessment?.classification,
+			item_count: Array.isArray(result?.items) ? result.items.length : 0,
+		});
+
 		const researchedItems = await researchExtractedItems(result.items || []);
 
-		return res.status(200).json({
+		mark("ai_research_complete", {
+			item_count: researchedItems.length,
+			researched_count: researchedItems.filter((item) => item.ai_item_research)
+				.length,
+		});
+
+		const responseBody = {
 			...result,
 			items: researchedItems,
 			attachment_processing: preparedPayload.attachment_processing,
+		};
+
+		mark("response_ready", {
+			total_ms: Date.now() - startedAt,
 		});
+
+		return res.status(200).json(responseBody);
 	} catch (error) {
-		console.error("Quote builder extract failed:", error);
+		console.error(
+			JSON.stringify({
+				event: "qb_extract_failed",
+				elapsed_ms: Date.now() - startedAt,
+				message: error?.message || String(error),
+				stack: error?.stack || null,
+			}),
+		);
 
 		return res.status(500).json({
 			error: "Quote extraction failed",
