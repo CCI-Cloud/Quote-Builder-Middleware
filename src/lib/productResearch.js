@@ -29,7 +29,26 @@ export async function researchExtractedItems(items = []) {
 			continue;
 		}
 
+		console.log(
+			JSON.stringify({
+				event: "qb_item_research_timing",
+				label: "item_start",
+				index,
+				normalized_name: item.normalized_name || null,
+				sku_or_mpn: item.sku_or_mpn || null,
+			}),
+		);
+
 		const aiItemResearch = await researchSingleItem(item);
+
+		console.log(
+			JSON.stringify({
+				event: "qb_item_research_timing",
+				label: "item_complete",
+				index,
+				elapsed_ms: Date.now() - itemStartedAt,
+			}),
+		);
 
 		researched.push({
 			...item,
