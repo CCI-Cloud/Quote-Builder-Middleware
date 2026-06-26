@@ -13,7 +13,9 @@ function getClient() {
 export async function researchExtractedItems(items = []) {
 	const researched = [];
 
-	for (const item of items) {
+	for (const [index, item] of items.entries()) {
+		const itemStartedAt = Date.now();
+
 		const shouldResearch =
 			item?.requires_review ||
 			!item?.normalized_name ||
