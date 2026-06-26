@@ -215,6 +215,7 @@ router.post("/extract", requireInternalToken, async (req, res) => {
 				process.env.QB_ENABLE_SYNC_AI_RESEARCH || "false",
 			).toLowerCase() === "true";
 
+		//for changes
 		const MAX_SYNC_RESEARCH_ITEMS = Number(
 			process.env.QB_MAX_SYNC_RESEARCH_ITEMS || 0,
 		);
