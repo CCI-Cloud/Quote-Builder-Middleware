@@ -38,6 +38,52 @@ function requireInternalToken(req, res, next) {
 	next();
 }
 
+//implementing a busy guard to limit concurrent requests to the extract and research endpoints. This is to prevent overloading the server (hostinger) and ensure that we don't exceed the capacity of our processing capabilities. The limits can be configured via environment variables.
+let activeExtractRequests = 0;
+let activeResearchRequests = 0;
+
+const MAX_EXTRACT_CONCURRENCY = Number(process.env.QB_EXTRACT_CONCURRENCY || 1);
+const MAX_RESEARCH_CONCURRENCY = Number(
+	process.env.QB_RESEARCH_CONCURRENCY || 1,
+);
+
+function withBusyGuard(kind, handler) {
+	return async function guardedRoute(req, res, next) {
+		const isExtract = kind === "extract";
+
+		const active = isExtract ? activeExtractRequests : activeResearchRequests;
+		const max = isExtract ? MAX_EXTRACT_CONCURRENCY : MAX_RESEARCH_CONCURRENCY;
+
+		if (active >= max) {
+			return res.status(503).json({
+				error: "Middleware busy",
+				message: `${kind} capacity is currently full. Please retry later.`,
+				kind,
+				active,
+				max,
+			});
+		}
+
+		if (isExtract) {
+			activeExtractRequests += 1;
+		} else {
+			activeResearchRequests += 1;
+		}
+
+		try {
+			await handler(req, res, next);
+		} catch (error) {
+			next(error);
+		} finally {
+			if (isExtract) {
+				activeExtractRequests -= 1;
+			} else {
+				activeResearchRequests -= 1;
+			}
+		}
+	};
+}
+
 //! old extract route pre timer implementation
 // router.post("/extract", requireInternalToken, async (req, res) => {
 // 	try {
@@ -157,210 +203,218 @@ function requireInternalToken(req, res, next) {
 // 	}
 // });
 
-router.post("/extract", requireInternalToken, async (req, res) => {
-	const startedAt = Date.now();
+router.post(
+	"/extract",
+	requireInternalToken,
+	withBusyGuard("extract", async (req, res) => {
+		const startedAt = Date.now();
 
-	function mark(label, extra = {}) {
-		console.log(
-			JSON.stringify({
-				event: "qb_timing",
-				label,
-				elapsed_ms: Date.now() - startedAt,
-				...extra,
-			}),
-		);
-	}
-
-	try {
-		mark("start");
-
-		const payload = normalizeNetSuitePayload(req.body);
-
-		mark("normalized", {
-			attachment_count: Array.isArray(payload.attachments)
-				? payload.attachments.length
-				: 0,
-			case_internalid: payload?.source?.case_internalid || null,
-			message_internalid: payload?.source?.message_internalid || null,
-		});
-
-		if (!payload.email.subject && !payload.email.body_text) {
-			return res.status(400).json({
-				error: "Missing email content.",
-			});
+		function mark(label, extra = {}) {
+			console.log(
+				JSON.stringify({
+					event: "qb_timing",
+					label,
+					elapsed_ms: Date.now() - startedAt,
+					...extra,
+				}),
+			);
 		}
 
-		const preparedPayload = await prepareExtractionPayload(payload);
+		try {
+			mark("start");
 
-		mark("prepared_payload", {
-			processed_attachments:
-				preparedPayload?.attachment_processing?.processed_count,
-			skipped_attachments:
-				preparedPayload?.attachment_processing?.skipped_count,
-			details: preparedPayload?.attachment_processing?.details || [],
-		});
+			const payload = normalizeNetSuitePayload(req.body);
 
-		const result = await extractQuoteRequest(preparedPayload);
-
-		mark("extraction_complete", {
-			is_quote: result?.quote_assessment?.is_quote_request,
-			classification: result?.quote_assessment?.classification,
-			item_count: Array.isArray(result?.items) ? result.items.length : 0,
-		});
-
-		//!new
-
-		const ENABLE_SYNC_AI_RESEARCH =
-			String(
-				process.env.QB_ENABLE_SYNC_AI_RESEARCH || "false",
-			).toLowerCase() === "true";
-
-		//for changes
-		const MAX_SYNC_RESEARCH_ITEMS = Number(
-			process.env.QB_MAX_SYNC_RESEARCH_ITEMS || 0,
-		);
-
-		let researchedItems = result.items || [];
-
-		if (ENABLE_SYNC_AI_RESEARCH && MAX_SYNC_RESEARCH_ITEMS > 0) {
-			const itemsForResearch = researchedItems.slice(
-				0,
-				MAX_SYNC_RESEARCH_ITEMS,
-			);
-
-			mark("ai_research_start", {
-				item_count: researchedItems.length,
-				sync_research_count: itemsForResearch.length,
+			mark("normalized", {
+				attachment_count: Array.isArray(payload.attachments)
+					? payload.attachments.length
+					: 0,
+				case_internalid: payload?.source?.case_internalid || null,
+				message_internalid: payload?.source?.message_internalid || null,
 			});
 
-			const researchedSubset = await researchExtractedItems(itemsForResearch);
+			if (!payload.email.subject && !payload.email.body_text) {
+				return res.status(400).json({
+					error: "Missing email content.",
+				});
+			}
 
-			researchedItems = researchedItems.map((item, index) => {
-				if (index < researchedSubset.length) {
-					return researchedSubset[index];
-				}
+			const preparedPayload = await prepareExtractionPayload(payload);
 
-				return {
+			mark("prepared_payload", {
+				processed_attachments:
+					preparedPayload?.attachment_processing?.processed_count,
+				skipped_attachments:
+					preparedPayload?.attachment_processing?.skipped_count,
+				details: preparedPayload?.attachment_processing?.details || [],
+			});
+
+			const result = await extractQuoteRequest(preparedPayload);
+
+			mark("extraction_complete", {
+				is_quote: result?.quote_assessment?.is_quote_request,
+				classification: result?.quote_assessment?.classification,
+				item_count: Array.isArray(result?.items) ? result.items.length : 0,
+			});
+
+			//!new
+
+			const ENABLE_SYNC_AI_RESEARCH =
+				String(
+					process.env.QB_ENABLE_SYNC_AI_RESEARCH || "false",
+				).toLowerCase() === "true";
+
+			//for changes
+			const MAX_SYNC_RESEARCH_ITEMS = Number(
+				process.env.QB_MAX_SYNC_RESEARCH_ITEMS || 0,
+			);
+
+			let researchedItems = result.items || [];
+
+			if (ENABLE_SYNC_AI_RESEARCH && MAX_SYNC_RESEARCH_ITEMS > 0) {
+				const itemsForResearch = researchedItems.slice(
+					0,
+					MAX_SYNC_RESEARCH_ITEMS,
+				);
+
+				mark("ai_research_start", {
+					item_count: researchedItems.length,
+					sync_research_count: itemsForResearch.length,
+				});
+
+				const researchedSubset = await researchExtractedItems(itemsForResearch);
+
+				researchedItems = researchedItems.map((item, index) => {
+					if (index < researchedSubset.length) {
+						return researchedSubset[index];
+					}
+
+					return {
+						...item,
+						ai_item_research: {
+							status: "deferred",
+							summary:
+								"AI item research deferred to avoid NetSuite request timeout.",
+							warnings: [
+								"AI item research was not run during synchronous extraction.",
+							],
+						},
+					};
+				});
+
+				mark("ai_research_complete", {
+					item_count: researchedItems.length,
+					researched_count: researchedItems.filter(
+						(item) => item.ai_item_research,
+					).length,
+				});
+			} else {
+				researchedItems = researchedItems.map((item) => ({
 					...item,
 					ai_item_research: {
 						status: "deferred",
-						summary:
-							"AI item research deferred to avoid NetSuite request timeout.",
+						summary: "AI item research deferred to background processing.",
 						warnings: [
 							"AI item research was not run during synchronous extraction.",
 						],
 					},
-				};
+				}));
+
+				mark("ai_research_deferred", {
+					item_count: researchedItems.length,
+				});
+			}
+			//!end
+
+			const responseBody = {
+				...result,
+				items: researchedItems,
+				attachment_processing: preparedPayload.attachment_processing,
+			};
+
+			mark("response_ready", {
+				total_ms: Date.now() - startedAt,
 			});
 
-			mark("ai_research_complete", {
-				item_count: researchedItems.length,
-				researched_count: researchedItems.filter(
-					(item) => item.ai_item_research,
-				).length,
-			});
-		} else {
-			researchedItems = researchedItems.map((item) => ({
-				...item,
-				ai_item_research: {
-					status: "deferred",
-					summary: "AI item research deferred to background processing.",
-					warnings: [
-						"AI item research was not run during synchronous extraction.",
-					],
-				},
-			}));
+			return res.status(200).json(responseBody);
+		} catch (error) {
+			console.error(
+				JSON.stringify({
+					event: "qb_extract_failed",
+					elapsed_ms: Date.now() - startedAt,
+					message: error?.message || String(error),
+					stack: error?.stack || null,
+				}),
+			);
 
-			mark("ai_research_deferred", {
-				item_count: researchedItems.length,
+			return res.status(500).json({
+				error: "Quote extraction failed",
+				message: error?.message || "Unknown error",
 			});
 		}
-		//!end
-
-		const responseBody = {
-			...result,
-			items: researchedItems,
-			attachment_processing: preparedPayload.attachment_processing,
-		};
-
-		mark("response_ready", {
-			total_ms: Date.now() - startedAt,
-		});
-
-		return res.status(200).json(responseBody);
-	} catch (error) {
-		console.error(
-			JSON.stringify({
-				event: "qb_extract_failed",
-				elapsed_ms: Date.now() - startedAt,
-				message: error?.message || String(error),
-				stack: error?.stack || null,
-			}),
-		);
-
-		return res.status(500).json({
-			error: "Quote extraction failed",
-			message: error?.message || "Unknown error",
-		});
-	}
-});
+	}),
+);
 
 //!new Research item route
-router.post("/research-items", requireInternalToken, async (req, res) => {
-	const startedAt = Date.now();
+router.post(
+	"/research-items",
+	requireInternalToken,
+	withBusyGuard("research", async (req, res) => {
+		const startedAt = Date.now();
 
-	function mark(label, extra = {}) {
-		console.log(
-			JSON.stringify({
-				event: "qb_research_timing",
-				label,
-				elapsed_ms: Date.now() - startedAt,
-				...extra,
-			}),
-		);
-	}
-
-	try {
-		const items = Array.isArray(req.body.items) ? req.body.items : [];
-
-		mark("start", {
-			intake_id: req.body.intake_id || null,
-			item_count: items.length,
-		});
-
-		if (!items.length) {
-			return res.status(400).json({
-				error: "No items supplied for research.",
-			});
+		function mark(label, extra = {}) {
+			console.log(
+				JSON.stringify({
+					event: "qb_research_timing",
+					label,
+					elapsed_ms: Date.now() - startedAt,
+					...extra,
+				}),
+			);
 		}
 
-		const researchedItems = await researchExtractedItems(items);
+		try {
+			const items = Array.isArray(req.body.items) ? req.body.items : [];
 
-		mark("research_complete", {
-			item_count: researchedItems.length,
-			total_ms: Date.now() - startedAt,
-		});
+			mark("start", {
+				intake_id: req.body.intake_id || null,
+				item_count: items.length,
+			});
 
-		return res.status(200).json({
-			intake_id: req.body.intake_id || null,
-			items: researchedItems,
-		});
-	} catch (error) {
-		console.error(
-			JSON.stringify({
-				event: "qb_research_failed",
-				elapsed_ms: Date.now() - startedAt,
-				message: error?.message || String(error),
-				stack: error?.stack || null,
-			}),
-		);
+			if (!items.length) {
+				return res.status(400).json({
+					error: "No items supplied for research.",
+				});
+			}
 
-		return res.status(500).json({
-			error: "AI item research failed",
-			message: error?.message || "Unknown error",
-		});
-	}
-});
+			const researchedItems = await researchExtractedItems(items);
+
+			mark("research_complete", {
+				item_count: researchedItems.length,
+				total_ms: Date.now() - startedAt,
+			});
+
+			return res.status(200).json({
+				intake_id: req.body.intake_id || null,
+				items: researchedItems,
+			});
+		} catch (error) {
+			console.error(
+				JSON.stringify({
+					event: "qb_research_failed",
+					elapsed_ms: Date.now() - startedAt,
+					message: error?.message || String(error),
+					stack: error?.stack || null,
+				}),
+			);
+
+			return res.status(500).json({
+				error: "AI item research failed",
+				message: error?.message || "Unknown error",
+			});
+		}
+	}),
+);
 
 // router.post("/supplier-research", async (req, res) => {
 // 	try {
