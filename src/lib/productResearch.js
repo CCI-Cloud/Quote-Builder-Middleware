@@ -10,13 +10,16 @@ function getClient() {
 	});
 }
 
-export async function researchExtractedItems(items = []) {
+export async function researchExtractedItems(items = [], options = {}) {
+	const forceResearch = options.force === true;
 	const researched = [];
 
 	for (const [index, item] of items.entries()) {
 		const itemStartedAt = Date.now();
 
 		const shouldResearch =
+			forceResearch ||
+			item?.force_research === true ||
 			item?.requires_review ||
 			!item?.normalized_name ||
 			!item?.brand ||

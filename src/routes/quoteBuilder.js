@@ -387,7 +387,9 @@ router.post(
 				});
 			}
 
-			const researchedItems = await researchExtractedItems(items);
+			const researchedItems = await researchExtractedItems(items, {
+				force: true,
+			});
 
 			mark("research_complete", {
 				item_count: researchedItems.length,
