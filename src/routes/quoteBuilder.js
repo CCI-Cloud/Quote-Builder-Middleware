@@ -291,14 +291,10 @@ router.post(
 
 					return {
 						...item,
-						ai_item_research: {
-							status: "deferred",
-							summary:
-								"AI item research deferred to avoid NetSuite request timeout.",
-							warnings: [
-								"AI item research was not run during synchronous extraction.",
-							],
-						},
+						ai_item_research: null,
+						ai_research_status: "deferred",
+						ai_research_reason:
+							"AI item research was deferred to avoid NetSuite request timeout.",
 					};
 				});
 
@@ -311,13 +307,10 @@ router.post(
 			} else {
 				researchedItems = researchedItems.map((item) => ({
 					...item,
-					ai_item_research: {
-						status: "deferred",
-						summary: "AI item research deferred to background processing.",
-						warnings: [
-							"AI item research was not run during synchronous extraction.",
-						],
-					},
+					ai_item_research: null,
+					ai_research_status: "deferred",
+					ai_research_reason:
+						"AI item research was deferred to background processing.",
 				}));
 
 				mark("ai_research_deferred", {
